@@ -5,6 +5,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[derive(Debug)]
 pub enum Error {
     CommandLine,
+    Database,
     Parsing,
 }
 
@@ -16,6 +17,7 @@ impl std::fmt::Display for Error {
     }
 }
 
+#[derive(Debug)]
 struct Db {
     data: BTreeMap<String, Vec<f32>>,
 }
@@ -25,6 +27,19 @@ impl Db {
         Self {
             data: BTreeMap::new(),
         }
+    }
+
+    fn insert(&mut self, key: String, value: f32) -> Result<()> {
+        if self.data.contains_key(&key) {
+            let mut new_values = vec![value];
+            let values = self.data.get(&key).ok_or(Error::Database)?;
+            new_values.append(&mut values.clone());
+            self.data.insert(key, new_values);
+        } else {
+            self.data.insert(key, vec![value]);
+        }
+
+        Ok(())
     }
 }
 
@@ -44,19 +59,23 @@ pub fn run() -> Result<()> {
     loop {
         let len = reader.read_line(&mut line)?;
 
-        println!("{line}");
+//        println!("{line}");
         let values = line.strip_suffix('\n').ok_or(Error::Parsing)?.split(';').collect::<Vec<&str>>();
-        println!("values = {:?}", values);
-        let name = values.first().ok_or(Error::Parsing)?;
+//        println!("values = {:?}", values);
+        let key = values.first().ok_or(Error::Parsing)?.to_string();
         let value = values.last().ok_or(Error::Parsing)?.parse::<f32>()?;
-        println!("name = {name}, value = {value}");
+//        println!("name = {name}, value = {value}");
         println!("i = {i} {len}");
         i += 1;
+
+        db.insert(key, value)?;
 
         if len == 0 {
             break;
         }
     }
+
+    println!("DB = {:?}", db);
 
     Ok(())
 }
